@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación Avanzada Pipeline CI/CD Enterprise v3</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h1 { color: #58a6ff; margin-bottom: 10px; text-align: center; }
+        p.subtitle { color: #8b949e; max-width: 800px; text-align: center; margin-bottom: 40px; }
+
+        .dashboard-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 15px;
+            padding: 40px 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 40px;
+        }
+
+        /* SVG GENERAL STYLES */
+        svg { width: 100%; height: auto; overflow: visible; }
+        .pipe-line { stroke: #30363d; stroke-width: 4; fill: none; }
+        .stage-box { fill: #21262d; stroke: #30363d; stroke-width: 2; rx: 8; }
+        .stage-text { font-size: 12px; fill: #8b949e; font-family: monospace; text-anchor: middle; }
+        .stage-title { font-size: 14px; fill: #e6edf3; font-weight: bold; text-anchor: middle; }
+
+        /* ANIMATIONS (Dashboard Principal) */
+        .artifact { animation: travelPipeline 12s infinite linear; transform-box: fill-box; transform-origin: center; }
+        
+        @keyframes travelPipeline {
+            0%   { transform: translate(50px, 100px); fill: #f78166; r: 8; opacity: 1; }
+            15%  { transform: translate(200px, 100px); fill: #f78166; } 
+            20%  { transform: translate(200px, 100px); fill: #d29922; r: 10; } 
+            35%  { transform: translate(400px, 100px); fill: #d29922; } 
+            40%  { transform: translate(400px, 100px); fill: #a371f7; r: 10; } 
+            45%  { transform: translate(400px, 100px); } 
+            55%  { transform: translate(600px, 100px); fill: #a371f7; }
+            60%  { transform: translate(600px, 100px); fill: #2f81f7; rect: 12; } 
+            75%  { transform: translate(800px, 100px); fill: #2f81f7; }
+            80%  { transform: translate(800px, 100px); fill: #2ea043; } 
+            95%  { transform: translate(950px, 100px); opacity: 1; }
+            100% { transform: translate(980px, 100px); opacity: 0; }
+        }
+
+        .status-light { fill: #30363d; animation: lightUp 12s infinite linear; }
+        .light-1 { animation-name: lightUp1; }
+        .light-2 { animation-name: lightUp2; }
+        .light-3 { animation-name: lightUp3; }
+        .light-4 { animation-name: lightUp4; }
+
+        @keyframes lightUp1 { 0%, 15% { fill: #30363d; } 20% { fill: #d29922; } 25% { fill: #2ea043; } 100% { fill: #2ea043; } }
+        @keyframes lightUp2 { 0%, 35% { fill: #30363d; } 40% { fill: #a371f7; } 45% { fill: #2ea043; } 100% { fill: #2ea043; } }
+        @keyframes lightUp3 { 0%, 55% { fill: #30363d; } 60% { fill: #2f81f7; } 65% { fill: #2ea043; } 100% { fill: #2ea043; } }
+        @keyframes lightUp4 { 0%, 75% { fill: #30363d; } 80% { fill: #2ea043; } 100% { fill: #2ea043; } }
+
+        /* --- INTERACTIVE LEGEND --- */
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .legend-item {
+            background: #21262d;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 5px solid;
+            cursor: pointer; 
+            transition: transform 0.2s, background 0.2s;
+            position: relative;
+        }
+
+        .legend-item:hover {
+            transform: translateY(-5px);
+            background: #2c333e;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .legend-item::after {
+            content: "ℹ️ Ver detalle + SVG";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 0.8em;
+            opacity: 0.5;
+        }
+
+        .legend h3 { margin: 0 0 10px 0; font-size: 1.2em; }
+        .legend p { margin: 0; font-size: 0.9em; color: #8b949e; }
+
+        /* --- MODAL STYLES --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 650px;
+            padding: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            color: #8b949e;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .close-btn:hover { color: #f85149; }
+
+        .modal-header h2 { margin-top: 0; color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 10px; }
+        
+        .tech-specs {
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            color: #ff7b72;
+            margin: 15px 0;
+            border: 1px solid #30363d;
+        }
+        
+        .detail-list { padding-left: 20px; }
+        .detail-list li { margin-bottom: 10px; color: #c9d1d9; }
+        .highlight { color: #e6edf3; font-weight: bold; }
+
+        /* STYLES FOR INTERNAL SVGs */
+        .modal-svg-container {
+            width: 100%;
+            background: #0d1117;
+            border-radius: 8px;
+            margin: 15px 0;
+            padding: 10px;
+            border: 1px dashed #30363d;
+            text-align: center;
+        }
+        .internal-svg-text { font-size: 10px; fill: #8b949e; text-anchor: middle; font-family: sans-serif; }
+        .internal-svg-path { fill: none; stroke: #58a6ff; stroke-width: 2; }
+        .internal-svg-box { fill: #21262d; stroke: #30363d; stroke-width: 2; }
+
+    </style>
+</head>
+<body>
+
+    <h1>Enterprise CI/CD Pipeline Monitor</h1>
+    <p class="subtitle">Monitor de Alta Disponibilidad. Haga clic en las tarjetas para inspeccionar la arquitectura detallada.</p>
+
+    <div class="dashboard-container">
+        <svg viewBox="0 0 1000 200" xmlns="http://www.w3.org/2000/svg">
+            <line x1="100" y1="100" x2="900" y2="100" class="pipe-line" />
+
+            <g transform="translate(150, 60)">
+                <rect width="100" height="80" class="stage-box" />
+                <circle cx="50" cy="-10" r="6" class="status-light light-1" />
+                <text x="50" y="35" class="stage-title">BUILD</text>
+                <text x="50" y="55" class="stage-text">Maven</text>
+            </g>
+
+            <g transform="translate(350, 60)">
+                <rect width="100" height="80" class="stage-box" />
+                <circle cx="50" cy="-10" r="6" class="status-light light-2" />
+                <text x="50" y="35" class="stage-title">QUALITY</text>
+                <text x="50" y="55" class="stage-text">SonarQube</text>
+                <path d="M85,40 L85,35" stroke="#f85149" stroke-width="3" />
+            </g>
+
+            <g transform="translate(550, 60)">
+                <rect width="100" height="80" class="stage-box" />
+                <circle cx="50" cy="-10" r="6" class="status-light light-3" />
+                <text x="50" y="35" class="stage-title">PACKAGE</text>
+                <text x="50" y="55" class="stage-text">Docker</text>
+            </g>
+
+            <g transform="translate(750, 60)">
+                <rect width="100" height="80" class="stage-box" />
+                <circle cx="50" cy="-10" r="6" class="status-light light-4" />
+                <text x="50" y="35" class="stage-title">CANARY</text>
+                <text x="50" y="55" class="stage-text">Argo CD</text>
+            </g>
+
+            <circle r="10" class="artifact" />
+        </svg>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item" style="border-color: #f78166;" onclick="openModal('modal-build')">
+            <h3 style="color: #f78166;">1. Code & Build</h3>
+            <p>Compilación y Tests Unitarios (JaCoCo).</p>
+        </div>
+        <div class="legend-item" style="border-color: #a371f7;" onclick="openModal('modal-quality')">
+            <h3 style="color: #a371f7;">2. Quality Gate</h3>
+            <p>Análisis estático y bloqueo por deuda técnica.</p>
+        </div>
+        <div class="legend-item" style="border-color: #2f81f7;" onclick="openModal('modal-package')">
+            <h3 style="color: #2f81f7;">3. Package (Docker)</h3>
+            <p>Creación de imágenes inmutables y registro.</p>
+        </div>
+        <div class="legend-item" style="border-color: #2ea043;" onclick="openModal('modal-deploy')">
+            <h3 style="color: #2ea043;">4. Canary Deploy</h3>
+            <p>Despliegue seguro con tráfico gradual.</p>
+        </div>
+    </div>
+
+    <div id="modal-build" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModalForce()">&times;</span>
+            <div class="modal-header"><h2>Etapa 1: CI Build & Test</h2></div>
+            
+            <div class="modal-svg-container">
+                <svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="20" y="30" width="40" height="40" rx="5" fill="#f78166" />
+                    <text x="40" y="55" class="internal-svg-text" fill="white">DEV</text>
+                    <rect x="120" y="30" width="40" height="40" rx="5" class="internal-svg-box" />
+                    <text x="140" y="55" class="internal-svg-text">GIT</text>
+                    <circle cx="250" cy="50" r="25" class="internal-svg-box" />
+                    <text x="250" y="55" class="internal-svg-text">MAVEN</text>
+                    <circle cx="350" cy="50" r="15" fill="#2ea043" />
+                    <path d="M345 50 L350 55 L360 40" stroke="white" stroke-width="3" fill="none"/>
+                    <line x1="60" y1="50" x2="120" y2="50" stroke="#58a6ff" stroke-width="2" stroke-dasharray="4"/>
+                    <line x1="160" y1="50" x2="225" y2="50" stroke="#58a6ff" stroke-width="2"/>
+                    <line x1="275" y1="50" x2="335" y2="50" stroke="#58a6ff" stroke-width="2"/>
+                </svg>
+            </div>
+
+            <p>Fase de saneamiento inicial. El código fuente se transforma en binario verificable.</p>
+            <div class="tech-specs">> mvn clean install jacoco:report</div>
+            <ul class="detail-list">
+                <li><span class="highlight">Aislamiento:</span> Uso de <strong>Mocks</strong> para DBs.</li>
+                <li><span class="highlight">Fail Fast:</span> Fallo inmediato si Test < 85%.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="modal-quality" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModalForce()">&times;</span>
+            <div class="modal-header"><h2>Etapa 2: Quality Gate</h2></div>
+            
+            <div class="modal-svg-container">
+                <svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="50" y="20" width="40" height="60" fill="white" opacity="0.1" stroke="#58a6ff"/>
+                    <line x1="55" y1="30" x2="85" y2="30" stroke="#58a6ff" stroke-width="2"/>
+                    <line x1="55" y1="40" x2="85" y2="40" stroke="#58a6ff" stroke-width="2"/>
+                    <g>
+                        <rect x="150" y="20" width="60" height="60" class="internal-svg-box" stroke="#a371f7" />
+                        <line x1="150" y1="50" x2="210" y2="50" stroke="#a371f7" stroke-width="2" stroke-dasharray="2"/>
+                        <text x="180" y="85" class="internal-svg-text">SONAR</text>
+                    </g>
+                    <rect x="300" y="20" width="30" height="60" rx="5" fill="#0d1117" stroke="#30363d"/>
+                    <circle cx="315" cy="35" r="8" fill="#f85149" opacity="0.2"/> <circle cx="315" cy="65" r="8" fill="#2ea043"/> <line x1="90" y1="50" x2="150" y2="50" stroke="#a371f7" stroke-width="2"/>
+                    <line x1="210" y1="50" x2="300" y2="50" stroke="#a371f7" stroke-width="2"/>
+                </svg>
+            </div>
+
+            <p>Auditoría estricta automatizada. Se busca deuda técnica y vulnerabilidades.</p>
+            <div class="tech-specs">-Dsonar.qualitygate.wait=true</div>
+            <ul class="detail-list">
+                <li><span class="highlight">Bloqueante:</span> 0 Bugs Críticos permitidos.</li>
+                <li><span class="highlight">Copy/Paste:</span> Prohibido > 3% duplicidad.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="modal-package" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModalForce()">&times;</span>
+            <div class="modal-header"><h2>Etapa 3: Docker Packaging</h2></div>
+            
+            <div class="modal-svg-container">
+                <svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="150" y="70" width="100" height="20" fill="#1f6feb" opacity="0.8"/>
+                    <text x="200" y="85" class="internal-svg-text" fill="white">OS (Alpine)</text>
+                    
+                    <rect x="150" y="50" width="100" height="20" fill="#1f6feb" opacity="0.6"/>
+                    <text x="200" y="65" class="internal-svg-text" fill="white">JRE 17</text>
+                    
+                    <rect x="150" y="30" width="100" height="20" fill="#1f6feb" opacity="0.4"/>
+                    <text x="200" y="45" class="internal-svg-text" fill="white">APP.JAR</text>
+
+                    <rect x="150" y="30" width="100" height="60" fill="none" stroke="#58a6ff" stroke-width="2"/>
+                    <path d="M100 50 L140 50" stroke="white" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="80" y="55" class="internal-svg-text">BUILD</text>
+                </svg>
+            </div>
+
+            <p>Empaquetado inmutable. Lo que se prueba aquí es idéntico a lo que va a Producción.</p>
+            <div class="tech-specs">docker build -t app:$SHA .</div>
+            <ul class="detail-list">
+                <li><span class="highlight">Multi-Stage:</span> Imagen final de solo 150MB.</li>
+                <li><span class="highlight">Trazabilidad:</span> Tagged con Git SHA.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="modal-deploy" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModalForce()">&times;</span>
+            <div class="modal-header"><h2>Etapa 4: Canary Release</h2></div>
+            
+            <div class="modal-svg-container">
+                <svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="40" cy="50" r="15" fill="white" opacity="0.2"/>
+                    <text x="40" y="55" class="internal-svg-text" fill="black">USERS</text>
+                    
+                    <path d="M70 50 L120 30" stroke="#58a6ff" stroke-width="2"/> <path d="M70 50 L120 70" stroke="#58a6ff" stroke-width="4"/> <rect x="130" y="15" width="80" height="30" rx="5" fill="#2f81f7" />
+                    <text x="170" y="35" class="internal-svg-text" fill="white">NEW (5%)</text>
+                    
+                    <rect x="130" y="55" width="80" height="30" rx="5" fill="#21262d" stroke="#30363d" />
+                    <text x="170" y="75" class="internal-svg-text">OLD (95%)</text>
+                    
+                    <rect x="280" y="20" width="80" height="60" class="internal-svg-box"/>
+                    <polyline points="290,70 310,60 330,65 350,40" fill="none" stroke="#2ea043" stroke-width="2"/>
+                    <text x="320" y="90" class="internal-svg-text">METRICS</text>
+                </svg>
+            </div>
+
+            <p>Despliegue progresivo. Si las métricas fallan, el sistema se revierte solo.</p>
+            <div class="tech-specs">kubectl get rollouts</div>
+            <ul class="detail-list">
+                <li><span class="highlight">Paso 1:</span> 5% Tráfico a nueva versión.</li>
+                <li><span class="highlight">Paso 2:</span> Monitoreo automático (2 min).</li>
+                <li><span class="highlight">Paso 3:</span> Rollout 100% o Rollback.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function openModal(modalId) { document.getElementById(modalId).style.display = 'flex'; }
+        function closeModal(event) { if (event.target === event.currentTarget) { event.target.style.display = 'none'; } }
+        function closeModalForce() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+    </script>
+
+</body>
+</html>
